@@ -38,12 +38,8 @@ class Node(object):
     def __repr__(self) -> str:
         return self.__str__()
 
-# 在图里面查找某个节点
-def find(graph, index):
-    return list(filter(lambda i: i.index == index, graph))[0]
-
 # ---------------------------------- Load Dataset -------------------------------------------
-dataset_name = 'dblp' # name of dataset
+dataset_name = 'football' # name of dataset
 path = './datasets/' + dataset_name + '.txt' # path to dataset
 iteration = 1           # number of iterations for label selection step (mostly is set to 1 or 2)
 merge_flag = 0         # merge_flag=0 -> do not merge //  merge_flag=1 -> do merge
@@ -90,7 +86,6 @@ for node in graph:
         similaritys = {}
         degrees = {}
         for neighbor_index in node.neighbors:
-            # neighbor = find(graph, neighbor_index)
             neighbor = graph[graph_index[neighbor_index]]
             # 每个邻接节点计算相似度
             intersect = len(list(set(node.neighbors) & set(neighbor.neighbors))) # 交集
@@ -146,7 +141,6 @@ for node in graph:
         else:
             # 有最相似的
             node.max_neighbor = node.max_similarity_neighbor  # 最相似的
-            # max_similarity_neighbor = find(graph, node.max_similarity_neighbor)
             max_similarity_neighbor = graph[graph_index[node.max_similarity_neighbor]]
             if node.Ni > max_similarity_neighbor.Ni:
                 # 当前节点比最相似的邻接节点更重要
@@ -162,7 +156,6 @@ for node in graph:
 
 # 选择与最大邻接节点相同的label
 for node in graph:
-    # same_label = find(graph, node.label)
     same_label = graph[graph_index[node.label]]
     node.label = same_label.label
         
@@ -174,7 +167,6 @@ top_5percent_nodes = graph[:top_5percent] # 得到前5%的节点
 # 让最重要的节点、他最相似的节点，使用同样的标签
 for node in top_5percent_nodes:
     temp_label = -1
-    # max_neighbor = find(graph, node.max_neighbor)
     max_neighbor = graph[graph_index[node.max_neighbor]]
     if node.Ni >= max_neighbor.Ni:
         # 如果当前节点的重要性大于邻接节点
@@ -192,7 +184,6 @@ for node in top_5percent_nodes:
     # 他两的共同邻居也使用同样的标签
     intersect = list(set(node.neighbors) & set(max_neighbor.neighbors)) # 交集
     for node_intersect_index in intersect:
-        # node_intersect = find(graph, node_intersect_index)
         node_intersect = graph[graph_index[node_intersect_index]]
         node_intersect.label = temp_label
         node_intersect.diffusion_flag = 1 # 标记已扩散
@@ -209,14 +200,13 @@ while high < low:
         # 所有邻接节点的 label
         c_importance_high = {}
 
-        for neighbor in node_high.neighbors:
-            # node_neighbor = find(graph, neighbor)
-            node_neighbor = graph[graph_index[neighbor]]
+        for neighbor_index in node_high.neighbors:
+            neighbor = graph[graph_index[neighbor_index]]
             # 论文公式(3)
-            if c_importance_high.__contains__(node_neighbor.label):
-                c_importance_high[node_neighbor.label] += node_neighbor.Ni
+            if c_importance_high.__contains__(neighbor.label):
+                c_importance_high[neighbor.label] += neighbor.Ni
             else:
-                c_importance_high[node_neighbor.label] = node_neighbor.Ni
+                c_importance_high[neighbor.label] = neighbor.Ni
 
         # 取邻接节点中c_importance最大的label
         node_high.label = max(c_importance_high, key = c_importance_high.get)
@@ -227,14 +217,13 @@ while high < low:
         # 上一步未扩散且度>1
         # 所有邻接节点的 label
         c_importance_low = {}
-        for neighbor in node_low.neighbors:
-            # node_neighbor = find(graph, neighbor)
-            node_neighbor = graph[graph_index[neighbor]]
+        for neighbor_index in node_low.neighbors:
+            neighbor = graph[graph_index[neighbor_index]]
             # 论文公式(4)
-            if c_importance_low.__contains__(node_neighbor.label):
-                c_importance_low[node_neighbor.label] += node_low.degree * node_neighbor.degree
+            if c_importance_low.__contains__(neighbor.label):
+                c_importance_low[neighbor.label] += node_low.degree * neighbor.degree
             else:
-                c_importance_low[node_neighbor.label] = node_low.degree * node_neighbor.degree
+                c_importance_low[neighbor.label] = node_low.degree * neighbor.degree
 
         # 取邻接节点中c_importance最大的label
         node_low.label = max(c_importance_low, key = c_importance_low.get)
@@ -248,7 +237,6 @@ while high < low:
 for node in graph:
     if node.degree == 1:
         # 取邻居的label
-        # node.label = find(graph, node.neighbors[0]).label
         node.label = graph[graph_index[node.neighbors[0]]].label
 
 # ---------------- Label selection step (the iterative part of algorithm) -------------------
@@ -257,7 +245,6 @@ for iter in range(1):
     # for node in graph:
     # 这里是按节点顺序遍历，不是按重要性，不确定是否有影响
     for node_index in range(N):
-        # node = find(graph, node_index)
         node = graph[graph_index[node_index]]
         if node.degree > 1:
             # 度>1
@@ -266,18 +253,28 @@ for iter in range(1):
             # 统计邻居社区的影响力
             effectiveness = {}
             for neighbor_index in node.neighbors:
-                # node_neighbor = find(graph, neighbor)
-                node_neighbor = graph[graph_index[neighbor_index]]
-                if label_frequency.__contains__(node_neighbor.label):
-                    label_frequency[node_neighbor.label] += 1
+                neighbor = graph[graph_index[neighbor_index]]
+                if label_frequency.__contains__(neighbor.label):
+                    label_frequency[neighbor.label] += 1
                 else:
-                    label_frequency[node_neighbor.label] = 1
+                    label_frequency[neighbor.label] = 1
 
-                # 论文公式(5)
-                if effectiveness.__contains__(node_neighbor.label):
-                    effectiveness[node_neighbor.label] *= node_neighbor.Ni
-                else:
-                    effectiveness[node_neighbor.label] = node_neighbor.Ni
+                # # 论文公式(5)
+                # if effectiveness.__contains__(neighbor.label):
+                #     effectiveness[neighbor.label] *= neighbor.Ni
+                # else:
+                #     effectiveness[neighbor.label] = neighbor.Ni
+
+                # # 修改为参考论文2
+                # # 找到他们的共同邻居，三角形
+                # intersect = list(set(node.neighbors) & set(neighbor.neighbors)) # 交集
+                # # 分别计算这些三角形的稳定性
+                # for node_triangle_index in intersect:
+                #     node_triangle = graph[graph_index[node_triangle_index]]
+                #     intersect = len(list(set(node.neighbors) & set(neighbor.neighbors))) # 交集
+                # # 参考论文2的公式(2)
+
+
 
             # 最大频率
             max_frequency = max(label_frequency.values())
@@ -288,17 +285,17 @@ for iter in range(1):
                 # 如果只有一个最大频率的标签
                 node.label = max_frequency_label[0]
             # else:
-            #     ################################################################################### 这里可以改？改成选三角形最稳固的
-            #     # 如果有多个，选择他们中社区影响度大的
-            #     max_effectiveness = -1
-            #     max_effectiveness_label = -1
-            #     for label in max_frequency_label:
-            #         # 找到最大的
-            #         if max_effectiveness < effectiveness[label]:
-            #             max_effectiveness = effectiveness[label]
-            #             max_effectiveness_label = label
+                ################################################################################### 这里可以改？改成选三角形最稳固的
+                # # 如果有多个，选择他们中社区影响度大的
+                # max_effectiveness = -1
+                # max_effectiveness_label = -1
+                # for label in max_frequency_label:
+                #     # 找到最大的
+                #     if max_effectiveness < effectiveness[label]:
+                #         max_effectiveness = effectiveness[label]
+                #         max_effectiveness_label = label
+                # node.label = max_effectiveness_label
 
-            #     node.label = max_effectiveness_label
 
 # ---------------------------- Merge Small communities --------------------------------------
 # 社区合并
@@ -332,7 +329,6 @@ if merge_flag == 1:
             max_RS_in_community = -1
             max_RS_node_in_community = -1
             for node_index in less_than_avg_community[label]:
-                # node = find(graph, node_index)
                 node = graph[graph_index[node_index]]
                 # 论文公式(6)
                 RS = node.degree + node.Ni
@@ -341,15 +337,13 @@ if merge_flag == 1:
                     max_RS_in_community = RS
                     max_RS_node_in_community = node.index
 
-            # represent_community = find(graph, max_RS_node_in_community)
             represent_community = graph[graph_index[max_RS_node_in_community]]
             
             # 社区代表的邻接节点，再算RS
             max_RS_in_neighbor = -1
             max_RS_node_in_neighbor = -1
             for neighbor_index in represent_community.neighbors:
-                # neighbor = find(graph, neighbor_index)
-                node_neighbor = graph[graph_index[neighbor_index]]
+                neighbor = graph[graph_index[neighbor_index]]
                 # 论文公式(6)
                 RS = neighbor.degree + neighbor.Ni
                 if RS > max_RS_in_neighbor:
@@ -357,7 +351,6 @@ if merge_flag == 1:
                     max_RS_in_neighbor = RS
                     max_RS_node_in_neighbor = neighbor.index
 
-            # represent_neighbor = find(graph, max_RS_node_in_neighbor)
             represent_neighbor = graph[graph_index[max_RS_node_in_neighbor]]
 
             # 判断是否需要更新社区的label
@@ -366,7 +359,6 @@ if merge_flag == 1:
                 # 社区代表节点的RS≤他RS最大的邻接节点
                 for node_index in less_than_avg_community[label]:
                     # 这个社区里所有节点的label改为社区代表节点RS最大的邻接节点的label
-                    # node = find(graph, node_index)
                     node = graph[graph_index[node_index]]
                     node.label = represent_neighbor.label
 

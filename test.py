@@ -39,7 +39,7 @@ class Node(object):
         return self.__str__()
 
 # ---------------------------------- Load Dataset -------------------------------------------
-dataset_name = 'football' # name of dataset
+dataset_name = 'karate' # name of dataset
 path = './datasets/' + dataset_name + '.txt' # path to dataset
 iteration = 1           # number of iterations for label selection step (mostly is set to 1 or 2)
 merge_flag = 1         # merge_flag=0 -> do not merge //  merge_flag=1 -> do merge
@@ -331,8 +331,10 @@ if merge_flag == 1:
     # 选择小于平局大小的社区
     less_than_avg_community = {k : v for k, v in community.items() if len(v) < avg_community}
 
+#######################################################################################################################
     # 按大小从小到大排序
     less_than_avg_community = {k : v for k, v in sorted(less_than_avg_community.items(), key=lambda item: len(item[1]), reverse=False)}
+#######################################################################################################################
 
     if len(less_than_avg_community) > 0:
         for label in less_than_avg_community.keys():
@@ -352,42 +354,76 @@ if merge_flag == 1:
             # RS最大的作为社区代表
             represent_community = graph[graph_index[max_RS_node_in_community]]
 
-            # # 社区代表最相似的邻居
-            # represent_community_neighbor = graph[graph_index[represent_community.max_neighbor]]
+#######################################################################################################################
 
-            # new_label = -1
-            # if represent_community.label != represent_community_neighbor.label:
-            #     new_label = represent_community_neighbor.label
-            # else:
-            #     # 他们共同的邻居
-            #     # 找到他们的共同邻居，三角形
-            #     intersect = list(set(node.neighbors) & set(neighbor.neighbors)) # 交集
-            
-            # 社区代表的邻接节点，再算RS
-            max_RS_in_neighbor = -1
-            max_RS_node_in_neighbor = -1
-            for neighbor_index in represent_community.neighbors:
-                neighbor = graph[graph_index[neighbor_index]]
-                # 论文公式(6)
-                RS = neighbor.degree + neighbor.Ni
-                if RS > max_RS_in_neighbor:
-                    # RS最大的作为社区代表
-                    max_RS_in_neighbor = RS
-                    max_RS_node_in_neighbor = neighbor.index
+            # 社区代表最相似的邻居
+            represent_community_neighbor = graph[graph_index[represent_community.max_neighbor]]
 
-            represent_neighbor = graph[graph_index[max_RS_node_in_neighbor]]
+            new_label = -1
+            if represent_community.label != represent_community_neighbor.label:
+                # 如果和他最相似的邻居标签不一样
+                # 用他最相似的邻居
+                new_label = represent_community_neighbor.label
 
-            # 判断是否需要更新社区的label
-            if represent_community.label != represent_neighbor.label and max_RS_in_community < max_RS_in_neighbor:
-                # 社区代表节点的label≠他RS最大的邻接节点的label
-                # 社区代表节点的RS≤他RS最大的邻接节点
+            else:
+                # 他们共同的邻居
+                # 找到他们的共同邻居，三角形
+                intersect = list(set(node.neighbors) & set(neighbor.neighbors)) # 交集
+
+                if len(intersect) > 0:
+                    # 社区代表、社区代表最相似的邻居，他们的共同邻居，再算RS
+                    max_RS_in_neighbor = -1
+                    max_RS_node_in_neighbor = -1
+                    for neighbor_index in intersect:
+                        neighbor = graph[graph_index[neighbor_index]]
+                        # 论文公式(6)
+                        RS = neighbor.degree + neighbor.Ni
+                        if RS > max_RS_in_neighbor:
+                            # RS最大的作为社区代表
+                            max_RS_in_neighbor = RS
+                            max_RS_node_in_neighbor = neighbor.index
+
+                    represent_neighbor = graph[graph_index[max_RS_node_in_neighbor]]
+
+                    if max_RS_in_community < max_RS_in_neighbor:
+                        # 社区代表节点的RS≤RS最大的共同邻居
+                        new_label = represent_neighbor.label
+
+            if new_label != -1 and represent_community.label != new_label:
+                # 社区代表节点的label≠更新的label
                 for node_index in less_than_avg_community[label]:
-                    # 这个社区里所有节点的label改为社区代表节点RS最大的邻接节点的label
+                    # 更新这个社区里所有节点的label
                     node = graph[graph_index[node_index]]
-                    node.label = represent_neighbor.label
+                    node.label = new_label
+
+            # # 社区代表的邻接节点，再算RS
+            # max_RS_in_neighbor = -1
+            # max_RS_node_in_neighbor = -1
+            # for neighbor_index in represent_community.neighbors:
+            #     neighbor = graph[graph_index[neighbor_index]]
+            #     # 论文公式(6)
+            #     RS = neighbor.degree + neighbor.Ni
+            #     if RS > max_RS_in_neighbor:
+            #         # RS最大的作为社区代表
+            #         max_RS_in_neighbor = RS
+            #         max_RS_node_in_neighbor = neighbor.index
+
+            # represent_neighbor = graph[graph_index[max_RS_node_in_neighbor]]
+
+            # # 判断是否需要更新社区的label
+            # if represent_community.label != represent_neighbor.label and max_RS_in_community < max_RS_in_neighbor:
+            #     # 社区代表节点的label≠他RS最大的邻接节点的label
+            #     # 社区代表节点的RS≤他RS最大的邻接节点
+            #     for node_index in less_than_avg_community[label]:
+            #         # 这个社区里所有节点的label改为社区代表节点RS最大的邻接节点的label
+            #         node = graph[graph_index[node_index]]
+            #         node.label = represent_neighbor.label
+
+#######################################################################################################################
 
 # -------------------------- Total Time of Algorithm --------------------------------------
 print(f'--- Total Execution time { round(time.time() - start_time, 6) } seconds ---')
+print(f'datasetname: {dataset_name}')
 # -------------------------------- Write to Disk ------------------------------------------
 graph_orderby_index = sorted(graph, key=lambda n: n.index, reverse=False)
 if write_flag == 1:

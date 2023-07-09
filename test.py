@@ -42,7 +42,7 @@ class Node(object):
 dataset_name = 'football' # name of dataset
 path = './datasets/' + dataset_name + '.txt' # path to dataset
 iteration = 1           # number of iterations for label selection step (mostly is set to 1 or 2)
-merge_flag = 0         # merge_flag=0 -> do not merge //  merge_flag=1 -> do merge
+merge_flag = 1         # merge_flag=0 -> do not merge //  merge_flag=1 -> do merge
 write_flag = 0        # 1 means write nodes labels to file. 0 means do not write
 modularity_flag = 0  # 1 means calculate modularity. 0 means do not calculate modularity
 NMI_flag = 1        # 1 means calculate NMI. 0 means do not calculate NMI
@@ -88,14 +88,14 @@ for node in graph:
         for neighbor_index in node.neighbors:
             neighbor = graph[graph_index[neighbor_index]]
             # 每个邻接节点计算相似度
-            intersect = len(list(set(node.neighbors) & set(neighbor.neighbors))) # 交集
-            union = node.degree + neighbor.degree - intersect # 并集
+            intersect_size = len(list(set(node.neighbors) & set(neighbor.neighbors))) # 交集
+            union_size = node.degree + neighbor.degree - intersect_size # 并集
             if node.degree >= neighbor.degree:
                 difference = len(set(neighbor.neighbors).difference(set(node.neighbors))) # 差集
             else:
                 difference = len(set(node.neighbors).difference(set(neighbor.neighbors)))# 差集
             # 相似性论文公式(1)
-            similarity = (intersect / (intersect + union)) * (intersect / (1 + difference))
+            similarity = (intersect_size / (intersect_size + union_size)) * (intersect_size / (1 + difference))
             similaritys[neighbor.index] = similarity
             # 重要性论文公式(2)
             Ni += similarity
@@ -197,7 +197,7 @@ while high < low:
     node_high = graph[high]
     if node_high.diffusion_flag == 0 and node_high.degree > 1:
         # 上一步未扩散且度>1
-        # 所有邻接节点的 label
+        # 所有邻接节点按label计算c_importance
         c_importance_high = {}
 
         for neighbor_index in node_high.neighbors:
@@ -215,8 +215,9 @@ while high < low:
     node_low = graph[low]
     if node_low.diffusion_flag == 0 and node_low.degree > 1:
         # 上一步未扩散且度>1
-        # 所有邻接节点的 label
+        # 所有邻接节点按label计算c_importance
         c_importance_low = {}
+
         for neighbor_index in node_low.neighbors:
             neighbor = graph[graph_index[neighbor_index]]
             # 论文公式(4)
@@ -259,22 +260,30 @@ for iter in range(1):
                 else:
                     label_frequency[neighbor.label] = 1
 
-                # # 论文公式(5)
-                # if effectiveness.__contains__(neighbor.label):
-                #     effectiveness[neighbor.label] *= neighbor.Ni
-                # else:
-                #     effectiveness[neighbor.label] = neighbor.Ni
+                # 论文公式(5)
+                if effectiveness.__contains__(neighbor.label):
+                    effectiveness[neighbor.label] *= neighbor.Ni
+                else:
+                    effectiveness[neighbor.label] = neighbor.Ni
 
                 # # 修改为参考论文2
                 # # 找到他们的共同邻居，三角形
                 # intersect = list(set(node.neighbors) & set(neighbor.neighbors)) # 交集
                 # # 分别计算这些三角形的稳定性
+                # stability = 0
                 # for node_triangle_index in intersect:
                 #     node_triangle = graph[graph_index[node_triangle_index]]
-                #     intersect = len(list(set(node.neighbors) & set(neighbor.neighbors))) # 交集
-                # # 参考论文2的公式(2)
 
-
+                #     if node.label == node_triangle.label:
+                #         # 参考论文2的公式(2)
+                #         intersect_size = len(list(set(node.neighbors) & set(neighbor.neighbors) & set(node_triangle.neighbors))) # 交集
+                #         union_size = len(list(set(node.neighbors) | set(neighbor.neighbors) | set(node_triangle.neighbors))) # 并集
+                #         stability += intersect_size / union_size
+                    
+                # if effectiveness.__contains__(neighbor.label):
+                #     effectiveness[neighbor.label] += stability
+                # else:
+                #     effectiveness[neighbor.label] = stability
 
             # 最大频率
             max_frequency = max(label_frequency.values())
@@ -284,17 +293,20 @@ for iter in range(1):
             if len(max_frequency_label) == 1:
                 # 如果只有一个最大频率的标签
                 node.label = max_frequency_label[0]
-            # else:
-                ################################################################################### 这里可以改？改成选三角形最稳固的
-                # # 如果有多个，选择他们中社区影响度大的
-                # max_effectiveness = -1
-                # max_effectiveness_label = -1
-                # for label in max_frequency_label:
-                #     # 找到最大的
-                #     if max_effectiveness < effectiveness[label]:
-                #         max_effectiveness = effectiveness[label]
-                #         max_effectiveness_label = label
-                # node.label = max_effectiveness_label
+            else:
+                # 如果有多个，选择他们中社区影响度大的
+                max_effectiveness = -1
+                max_effectiveness_label = -1
+                for label in max_frequency_label:
+                    # # 如果有一个跟之前一样，直接不修改
+                    # if node.label == label:
+                    #     max_effectiveness_label = label
+                    #     break
+                    # 找到最大的
+                    if max_effectiveness < effectiveness[label]:
+                        max_effectiveness = effectiveness[label]
+                        max_effectiveness_label = label
+                node.label = max_effectiveness_label
 
 
 # ---------------------------- Merge Small communities --------------------------------------
@@ -309,18 +321,18 @@ if merge_flag == 1:
             community[node.label] = []
             community[node.label].append(node.index)
 
-    # more_than_1_community = [k for k, v in community.items() if v > 1]
-
     # 最大的社区
     max_community_label = max(community, key = community.get)
     max_community = len(community[max_community_label])
 
     # 去除最大社区后平均社区大小
     avg_community = (N - max_community) / (len(community) - 1)
-    avg_community = 34
 
     # 选择小于平局大小的社区
-    less_than_avg_community = {k:v for k, v in community.items() if len(v) < avg_community}
+    less_than_avg_community = {k : v for k, v in community.items() if len(v) < avg_community}
+
+    # 按大小从小到大排序
+    less_than_avg_community = {k : v for k, v in sorted(less_than_avg_community.items(), key=lambda item: len(item[1]), reverse=False)}
 
     if len(less_than_avg_community) > 0:
         for label in less_than_avg_community.keys():
@@ -337,7 +349,19 @@ if merge_flag == 1:
                     max_RS_in_community = RS
                     max_RS_node_in_community = node.index
 
+            # RS最大的作为社区代表
             represent_community = graph[graph_index[max_RS_node_in_community]]
+
+            # # 社区代表最相似的邻居
+            # represent_community_neighbor = graph[graph_index[represent_community.max_neighbor]]
+
+            # new_label = -1
+            # if represent_community.label != represent_community_neighbor.label:
+            #     new_label = represent_community_neighbor.label
+            # else:
+            #     # 他们共同的邻居
+            #     # 找到他们的共同邻居，三角形
+            #     intersect = list(set(node.neighbors) & set(neighbor.neighbors)) # 交集
             
             # 社区代表的邻接节点，再算RS
             max_RS_in_neighbor = -1
@@ -354,7 +378,7 @@ if merge_flag == 1:
             represent_neighbor = graph[graph_index[max_RS_node_in_neighbor]]
 
             # 判断是否需要更新社区的label
-            if represent_community.label != represent_neighbor.label and max_RS_in_community <= max_RS_in_neighbor:
+            if represent_community.label != represent_neighbor.label and max_RS_in_community < max_RS_in_neighbor:
                 # 社区代表节点的label≠他RS最大的邻接节点的label
                 # 社区代表节点的RS≤他RS最大的邻接节点
                 for node_index in less_than_avg_community[label]:

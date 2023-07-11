@@ -39,7 +39,7 @@ class Node(object):
         return self.__str__()
 
 # ---------------------------------- Load Dataset -------------------------------------------
-dataset_name = 'karate' # name of dataset
+dataset_name = 'dblp' # name of dataset
 path = './datasets/' + dataset_name + '.txt' # path to dataset
 iteration = 1           # number of iterations for label selection step (mostly is set to 1 or 2)
 merge_flag = 1         # merge_flag=0 -> do not merge //  merge_flag=1 -> do merge
@@ -50,6 +50,17 @@ NMI_flag = 1        # 1 means calculate NMI. 0 means do not calculate NMI
 
 graph = [] # 图，由Node组成
 graph_index = {} # 记录每个序号的位置
+
+def write_result(graph, step):
+    graph_orderby_index = sorted(graph, key=lambda n: n.index, reverse=False)
+    if write_flag == 1:
+
+        if not os.path.exists('./results/'):
+            os.makedirs('./results/')
+
+        with open('./results/' + dataset_name + str(step) + 'my.txt', 'w') as filehandle:
+            for node in graph_orderby_index:
+                filehandle.write(f'{node.label}\n')
 
 # ------------------------- compute nodes neighbors and nodes degree --------------------------
 # 读取数据库
@@ -158,6 +169,8 @@ for node in graph:
 for node in graph:
     same_label = graph[graph_index[node.label]]
     node.label = same_label.label
+
+write_result(graph, 1)
         
 # ----------------------------- Top 5 percent important nodes -------------------------------
 # 前5%重要性的label三角扩散
@@ -187,6 +200,8 @@ for node in top_5percent_nodes:
         node_intersect = graph[graph_index[node_intersect_index]]
         node_intersect.label = temp_label
         node_intersect.diffusion_flag = 1 # 标记已扩散
+
+write_result(graph, 2)
 
 # -------------------------------- Balanced Label diffusion ---------------------------------
 # 取重要度最大和最小的两个点
@@ -239,6 +254,8 @@ for node in graph:
     if node.degree == 1:
         # 取邻居的label
         node.label = graph[graph_index[node.neighbors[0]]].label
+
+write_result(graph, 3)
 
 # ---------------- Label selection step (the iterative part of algorithm) -------------------
 # 标签选择，迭代次数由最开始参数决定
@@ -307,6 +324,8 @@ for iter in range(1):
                         max_effectiveness = effectiveness[label]
                         max_effectiveness_label = label
                 node.label = max_effectiveness_label
+
+write_result(graph, 4)
 
 
 # ---------------------------- Merge Small communities --------------------------------------
@@ -419,6 +438,8 @@ if merge_flag == 1:
             #         node = graph[graph_index[node_index]]
             #         node.label = represent_neighbor.label
 
+write_result(graph, 5)
+
 #######################################################################################################################
 
 # -------------------------- Total Time of Algorithm --------------------------------------
@@ -426,14 +447,7 @@ print(f'--- Total Execution time { round(time.time() - start_time, 6) } seconds 
 print(f'datasetname: {dataset_name}')
 # -------------------------------- Write to Disk ------------------------------------------
 graph_orderby_index = sorted(graph, key=lambda n: n.index, reverse=False)
-if write_flag == 1:
-
-    if not os.path.exists('./results/'):
-        os.makedirs('./results/')
-
-    with open('./results/' + dataset_name + '.txt', 'w') as filehandle:
-        for node in graph_orderby_index:
-            filehandle.write(f'{node.label}\n')
+write_result(graph, 0)
 # ---------------------------- Number of communities --------------------------------------
 # 统计分了多少类
 labels = {}
